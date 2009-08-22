@@ -32,9 +32,19 @@ final class btree
     const KPNODE = 'kp';
 
     /**
+     * Size of node chache
+     */
+    const NODECHACHE_SIZE = 64;
+
+    /**
      * BTree file handle
      */
     private $handle;
+
+    /**
+     * Node cache
+     */
+    private $nodecache;
 
     /**
      * Use static method open() to get instance
@@ -236,7 +246,7 @@ final class btree
             $root = NULL;
 
             if (($size = ftell($this->handle)) === FALSE) return array(NULL, NULL);
-            for ($i = -1; ($off = $i * 128) + $size > 128; --$i) {
+            for ($i = -1; ($off = $i * 128) + $size > 128; --$i) {
                 if (fseek($this->handle, $off, SEEK_END) === -1) return array(NULL, NULL);
                 $data = fread($this->handle, 256);
                 if (($pos = strrpos($data, self::HEADER)) !== FALSE) {
@@ -261,12 +271,19 @@ final class btree
      */
     private function node($p)
     {
-        if (fseek($this->handle, $p, SEEK_SET) === -1) return array(NULL, NULL);
-        if (strlen($data = fread($this->handle, self::SIZEOF_INT))
-            !== self::SIZEOF_INT) return array(NULL, NULL);
-        list(,$n) = unpack('N', $data);
-        if (strlen($node = fread($this->handle, $n)) !== $n) return array(NULL, NULL);
-        return self::unserialize($node);
+        if (!isset($this->nodecache[$p])) {
+            if (fseek($this->handle, $p, SEEK_SET) === -1) return array(NULL, NULL);
+            if (strlen($data = fread($this->handle, self::SIZEOF_INT))
+                !== self::SIZEOF_INT) return array(NULL, NULL);
+            list(,$n) = unpack('N', $data);
+            if (strlen($node = fread($this->handle, $n)) !== $n) return array(NULL, NULL);
+
+            if (count($this->nodecache) + 1 > self::NODECHACHE_SIZE)
+                array_splice($this->nodecache, self::NODECHACHE_SIZE);
+            $this->nodecache[$p] = self::unserialize($node);
+        }
+
+        return $this->nodecache[$p];
     }
 
     /**
