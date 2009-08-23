@@ -229,10 +229,10 @@ final class btree
         $l = max(0, $l + ($l >= count($keys) ? -1 : (strcmp($keys[$l], $key) <= 0 ? 0 : -1)));
 
         list($child_type, $child) = $this->node($node[$keys[$l]]);
-        if ($child_type === NULL || $child === NULL) return NULL;
+        if ($child_type === NULL || $child === NULL) return array(NULL);
 
         $children = $this->lookup($key, $child_type, $child);
-        if ($children === NULL) return NULL;
+        if ($children === NULL) return array(NULL);
 
         return $children;
     }
