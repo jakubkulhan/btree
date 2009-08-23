@@ -136,7 +136,7 @@ final class btree
                 array_push($lookup, $upnode);
             }
 
-            ksort($node);
+            ksort($node, SORT_STRING);
             if (count($node) <= self::NODE_SLOTS) $nodes = array($node);
             else $nodes = array_chunk($node, ceil(count($node) / ceil(count($node) / self::NODE_SLOTS)), TRUE);
 
