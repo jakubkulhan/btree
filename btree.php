@@ -197,11 +197,23 @@ final class btree
         return array_merge(array($node), $this->{'lookup' . $node_type}($key, $node));
     }
 
+    /**
+     * Look up key-value node
+     * @param string
+     * @param array
+     * @return array
+     */
     private function lookupkv($key, $node)
     {
         return array();
     }
 
+    /**
+     * Look up key-pointer node
+     * @param string
+     * @param array
+     * @return array
+     */
     private function lookupkp($key, $node)
     {
         $keys = array_keys($node);
