@@ -238,17 +238,76 @@ final class btree
     }
 
     /**
+     * Get positions of all leaves
+     * @return array pointers to leaves; NULL on failure
+     */
+    public function leaves()
+    {
+        if (($root = $this->roothunt()) === NULL) return NULL;
+        return $this->leafhunt($root);
+    }
+
+    /**
+     * Find positions of all leaves
+     * @param int pointer to node
+     * @return array pairs of (leaf, pointer); NULL on failure
+     */
+    private function leafhunt($p)
+    {
+        list($node_type, $node) = $this->node($p);
+        if ($node_type === NULL || $node === NULL) return NULL;
+        return $this->{'leafhunt' . $node_type}($p, $node);
+    }
+
+    /**
+     * Return position of key-value node
+     * @param int pointer to node
+     * @param array
+     * @return array
+     */
+    private function leafhuntkv($p, $node)
+    {
+        return array(current(array_keys($node)) => $p);
+    }
+
+    /**
+     * Extract positions of leaves from this node or children nodes
+     * @param int pointer to node
+     * @param array node
+     * @return array
+     */
+    private function leafhuntkp($_ /* not used */, $node)
+    {
+        $ret = array();
+        foreach ($node as $k => $v) {
+            if (($leaves = $this->leafhunt($v)) === NULL) return NULL;
+            $ret = array_merge($ret, $leaves);
+        }
+        return $ret;
+    }
+
+    /**
      * Get root node
      * @return array 0 => node type, 1 => node; array(NULL, NULL) on failure
      */
     private function root()
     {
+        if (($p = $this->roothunt()) === NULL) return array(NULL, NULL);
+        return $this->node($p);
+    }
+
+    /**
+     * Try to get position of root
+     * @return int pointer to root; NULL on failure
+     */
+    private function roothunt()
+    {
         // try EOF
         if (fseek($this->handle, -(self::SIZEOF_HEADER + self::SIZEOF_INT), SEEK_END) 
-            === -1) return array(NULL, NULL);
+            === -1) return NULL;
 
         if (strlen($data = fread($this->handle, self::SIZEOF_INT + self::SIZEOF_HEADER)) 
-            !== self::SIZEOF_INT + self::SIZEOF_HEADER) return array(NULL, NULL);
+            !== self::SIZEOF_INT + self::SIZEOF_HEADER) return NULL;
 
         $header = substr($data, self::SIZEOF_INT);
         $root = substr($data, 0, self::SIZEOF_INT);
@@ -257,9 +316,9 @@ final class btree
         if (substr($data, self::SIZEOF_INT) !== self::HEADER) {
             $root = NULL;
 
-            if (($size = ftell($this->handle)) === FALSE) return array(NULL, NULL);
+            if (($size = ftell($this->handle)) === FALSE) return NULL;
             for ($i = -1; ($off = $i * 128) + $size > 128; --$i) {
-                if (fseek($this->handle, $off, SEEK_END) === -1) return array(NULL, NULL);
+                if (fseek($this->handle, $off, SEEK_END) === -1) return NULL;
                 $data = fread($this->handle, 256);
                 if (($pos = strrpos($data, self::HEADER)) !== FALSE) {
                     if ($pos === 0) continue;
@@ -268,12 +327,12 @@ final class btree
                 }
             }
 
-            if ($root === NULL) return array(NULL, NULL);
+            if ($root === NULL) return NULL;
         }
 
-        // get root node
+        // unpack root pointer
         list(,$p) = unpack('N', $root);
-        return $this->node($p);
+        return $p;
     }
 
     /**
@@ -281,7 +340,7 @@ final class btree
      * @param int pointer to node (offset in file)
      * @retrun array 0 => node type, 1 => node; array(NULL, NULL) on failure
      */
-    private function node($p)
+    public function node($p)
     {
         if (!isset($this->nodecache[$p])) {
             if (fseek($this->handle, $p, SEEK_SET) === -1) return array(NULL, NULL);

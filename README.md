@@ -30,6 +30,20 @@ Delete key:
 
 That is all you need.
 
+## Advanced
+
+Need all values? Get pointers to all leaf nodes:
+
+    $leaves = $btree->leaves();
+
+And then process nodes:
+
+    $values = array();
+    foreach ($leaves as $p) {
+        list(,$leaf) = $btree->node($leaf);
+        $values += $leaf;
+    }
+
 ## License
 
 The MIT license:
