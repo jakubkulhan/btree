@@ -37,21 +37,27 @@ final class btree
     const NODECHACHE_SIZE = 64;
 
     /**
-     * BTree file handle
+     * @var resource BTree file handle
      */
     private $handle;
 
     /**
-     * Node cache
+     * @var string BTree filename
      */
-    private $nodecache;
+    private $filename;
+
+    /**
+     * @var array Node cache
+     */
+    private $nodecache = array();
 
     /**
      * Use static method open() to get instance
      */
-    private function __construct($handle)
+    private function __construct($handle, $filename)
     {
         $this->handle = $handle;
+        $this->filename = $filename;
     }
 
     /**
@@ -287,6 +293,86 @@ final class btree
     }
 
     /**
+     * Remove old nodes from BTree file
+     * @return bool TRUE if everything went well; FALSE otherwise
+     */
+    public function compact()
+    {
+        // I believe in uniqid(), so no checking if file already exists and locking
+        $compact_filename = uniqid($this->filename . '~', TRUE);
+        if (!($compact = fopen($compact_filename, 'a+b'))) return FALSE;
+
+        if (!((
+            fseek($compact, 0, SEEK_END) !== -1 &&
+            $root = $this->copyto($compact)) !== NULL && 
+            self::header($compact, $root) !== FALSE && 
+            fflush($compact) && 
+            @rename($compact_filename, $this->filename) /* will not work under windows, sorry */
+        ))
+        {
+            fclose($compact);
+            @unlink($compact_filename);
+            return FALSE;
+        }
+
+        $this->nodecache = array();
+        fclose($this->handle);
+        $this->handle = $compact;
+        return TRUE;
+    }
+
+    /**
+     * Copy node from opened file to another
+     * @param resource
+     * @param string
+     * @param array
+     * @return int new pointer to copied node; 
+     */
+    private function copyto($to, $node_type = NULL, $node = NULL)
+    {
+        if ($node_type === NULL || $node === NULL) list($node_type, $node) = $this->root();
+        if ($node_type === NULL || $node === NULL) return NULL;
+        return $this->{'copyto' . $node_type}($to, $node);
+    }
+
+    /**
+     * Copy key-value node from opened file to another
+     * @param resource
+     * @param array
+     * @return int new pointer to copied node
+     */
+    private function copytokv($to, $node)
+    {
+        $serialized = self::serialize(self::KVNODE, $node);
+        $to_write = pack('N', strlen($serialized)) . $serialized;
+        if (($p = ftell($to)) === FALSE) return NULL;
+        if (fwrite($to, $to_write, strlen($to_write)) !== strlen($to_write)) return NULL;
+        return $p;
+    }
+
+    /**
+     * Copy key-pointer node from opened file to another
+     * @param resource
+     * @param array
+     * @return int new pointer to copied node
+     */
+    private function copytokp($to, $node)
+    {
+        foreach ($node as &$i) {
+            list($child_type, $child) = $this->node($i);
+            if ($child_type === NULL || $child === NULL) return NULL;
+            if (($i = $this->copyto($to, $child_type, $child)) === NULL) return NULL;
+        }
+
+        $serialized = self::serialize(self::KPNODE, $node);
+        $to_write = pack('N', strlen($serialized)) . $serialized;
+        if (($p = ftell($to)) === FALSE) return NULL;
+        if (fwrite($to, $to_write, strlen($to_write)) !== strlen($to_write)) return NULL;
+        return $p;
+    }
+
+
+    /**
      * Get root node
      * @return array 0 => node type, 1 => node; array(NULL, NULL) on failure
      */
@@ -360,9 +446,10 @@ final class btree
     /**
      * Open/create new btree
      */
-    public static function open($file)
+    public static function open($filename)
     {
-        if (!($handle = @fopen($file, 'a+b'))) return FALSE;
+        if (!($handle = @fopen($filename, 'a+b'))) return FALSE;
+        if (($filename = realpath($filename)) === FALSE) return FALSE;
 
         // write default node if neccessary
         if (fseek($handle, 0, SEEK_END) === -1) {
@@ -386,7 +473,7 @@ final class btree
         }
 
         // create instance
-        return new self($handle);
+        return new self($handle, $filename);
     }
 
     /**

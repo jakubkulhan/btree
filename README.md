@@ -44,6 +44,10 @@ And then process nodes:
         $values += $leaf;
     }
 
+Does your B+Tree consume a lot of space? Then compact it:
+
+    $btree->compact();
+
 ## License
 
 The MIT license:
