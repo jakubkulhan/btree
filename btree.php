@@ -200,47 +200,31 @@ final class btree
     {
         if ($node_type === NULL || $node === NULL) list($node_type, $node) = $this->root();
         if ($node_type === NULL || $node === NULL) return array(NULL);
-        return array_merge(array($node), $this->{'lookup' . $node_type}($key, $node));
-    }
+        $ret = array();
 
-    /**
-     * Look up key-value node
-     * @param string
-     * @param array
-     * @return array
-     */
-    private function lookupkv($key, $node)
-    {
-        return array();
-    }
+        do {
+            array_push($ret, $node);
+            if ($node_type === self::KVNODE) $node = NULL;
+            else {
+                $keys = array_keys($node);
+                $l = 0;
+                $r = count($keys);
 
-    /**
-     * Look up key-pointer node
-     * @param string
-     * @param array
-     * @return array
-     */
-    private function lookupkp($key, $node)
-    {
-        $keys = array_keys($node);
-        $l = 0;
-        $r = count($keys);
+                while ($l < $r) {
+                    $i = $l + intval(($r - $l) / 2);
+                    if (strcmp($keys[$i], $key) < 0) $l = $i + 1;
+                    else $r = $i;
+                }
 
-        while ($l < $r) {
-            $i = $l + intval(($r - $l) / 2);
-            if (strcmp($keys[$i], $key) < 0) $l = $i + 1;
-            else $r = $i;
-        }
+                $l = max(0, $l + ($l >= count($keys) ? -1 : (strcmp($keys[$l], $key) <= 0 ? 0 : -1)));
 
-        $l = max(0, $l + ($l >= count($keys) ? -1 : (strcmp($keys[$l], $key) <= 0 ? 0 : -1)));
+                list($node_type, $node) = $this->node($node[$keys[$l]]);
+                if ($node_type === NULL || $node === NULL) return array(NULL);
+            }
 
-        list($child_type, $child) = $this->node($node[$keys[$l]]);
-        if ($child_type === NULL || $child === NULL) return array(NULL);
+        } while ($node !== NULL);
 
-        $children = $this->lookup($key, $child_type, $child);
-        if ($children === NULL) return array(NULL);
-
-        return $children;
+        return $ret;
     }
 
     /**
@@ -262,33 +246,28 @@ final class btree
     {
         list($node_type, $node) = $this->node($p);
         if ($node_type === NULL || $node === NULL) return NULL;
-        return $this->{'leafhunt' . $node_type}($p, $node);
-    }
-
-    /**
-     * Return position of key-value node
-     * @param int pointer to node
-     * @param array
-     * @return array
-     */
-    private function leafhuntkv($p, $node)
-    {
-        return array(current(array_keys($node)) => $p);
-    }
-
-    /**
-     * Extract positions of leaves from this node or children nodes
-     * @param int pointer to node
-     * @param array node
-     * @return array
-     */
-    private function leafhuntkp($_ /* not used */, $node)
-    {
+        $nodes = array(array($node_type, $node, $p));
         $ret = array();
-        foreach ($node as $k => $v) {
-            if (($leaves = $this->leafhunt($v)) === NULL) return NULL;
-            $ret = array_merge($ret, $leaves);
-        }
+
+        do {
+            $new_nodes = array();
+            foreach ($nodes as $_) {
+                list($node_type, $node, $p) = $_;
+                if ($node_type === self::KVNODE) $ret[current(array_keys($node))] = $p;
+                else {
+                    foreach ($node as $i) {
+                        list($child_type, $child) = $this->node($i);
+                        if ($child_type === NULL || $child === NULL) return NULL;
+
+                        if ($child_type === self::KVNODE) $ret[current(array_keys($child))] = $i;
+                        else $new_nodes[] = array($child_type, $child, $i);
+                    }
+                }
+            }
+            $nodes = $new_nodes;
+
+        } while (count($nodes) > 1);
+
         return $ret;
     }
 
@@ -332,45 +311,46 @@ final class btree
     {
         if ($node_type === NULL || $node === NULL) list($node_type, $node) = $this->root();
         if ($node_type === NULL || $node === NULL) return NULL;
-        return $this->{'copyto' . $node_type}($to, $node);
-    }
+        if ($node_type === self::KPNODE) 
+            foreach ($node as $k => $v) $node[$k] = array($v);
+        $stack = array(array($node_type, $node));
 
-    /**
-     * Copy key-value node from opened file to another
-     * @param resource
-     * @param array
-     * @return int new pointer to copied node
-     */
-    private function copytokv($to, $node)
-    {
-        $serialized = self::serialize(self::KVNODE, $node);
-        $to_write = pack('N', strlen($serialized)) . $serialized;
-        if (($p = ftell($to)) === FALSE) return NULL;
-        if (fwrite($to, $to_write, strlen($to_write)) !== strlen($to_write)) return NULL;
+        do {
+            list($node_type, $node) = array_pop($stack);
+            if ($node_type === self::KPNODE) {
+                $pushed = FALSE;
+                foreach ($node as $i) {
+                    if (is_array($i)) {
+                        list($child_type, $child) = $this->node($i[0]);
+                        if ($child_type === NULL || $child === NULL) return NULL;
+                        if ($child_type === self::KPNODE) 
+                            foreach ($child as $k => $v) $child[$k] = array($v);
+
+                        array_push($stack, array($node_type, $node));
+                        array_push($stack, array($child_type, $child));
+                        $pushed = TRUE;
+                        break;
+                    }
+                }
+
+                if ($pushed) continue;
+            }
+
+            if (!empty($stack)) list($upnode_type, $upnode) = array_pop($stack);
+            else list($upnode_type, $upnode) = array(NULL, array());
+
+            $serialized = self::serialize($node_type, $node);
+            $to_write = pack('N', strlen($serialized)) . $serialized;
+            if (($p = ftell($to)) === FALSE) return NULL;
+            if (fwrite($to, $to_write, strlen($to_write)) !== strlen($to_write)) return NULL;
+
+            $upnode[current(array_keys($node))] = $p;
+            if (!(empty($stack) && $upnode_type === NULL)) array_push($stack, array($upnode_type, $upnode));
+
+        } while (!empty($stack));
+
         return $p;
     }
-
-    /**
-     * Copy key-pointer node from opened file to another
-     * @param resource
-     * @param array
-     * @return int new pointer to copied node
-     */
-    private function copytokp($to, $node)
-    {
-        foreach ($node as &$i) {
-            list($child_type, $child) = $this->node($i);
-            if ($child_type === NULL || $child === NULL) return NULL;
-            if (($i = $this->copyto($to, $child_type, $child)) === NULL) return NULL;
-        }
-
-        $serialized = self::serialize(self::KPNODE, $node);
-        $to_write = pack('N', strlen($serialized)) . $serialized;
-        if (($p = ftell($to)) === FALSE) return NULL;
-        if (fwrite($to, $to_write, strlen($to_write)) !== strlen($to_write)) return NULL;
-        return $p;
-    }
-
 
     /**
      * Get root node
