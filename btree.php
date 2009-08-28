@@ -441,14 +441,14 @@ final class btree
     public function node($p)
     {
         if (!isset($this->nodecache[$p])) {
+            while (count($this->nodecache) + 1 > self::NODECHACHE_SIZE) array_pop($this->nodecache);
+            
             if (fseek($this->handle, $p, SEEK_SET) === -1) return array(NULL, NULL);
             if (strlen($data = fread($this->handle, self::SIZEOF_INT))
                 !== self::SIZEOF_INT) return array(NULL, NULL);
             list(,$n) = unpack('N', $data);
             if (strlen($node = fread($this->handle, $n)) !== $n) return array(NULL, NULL);
 
-            if (count($this->nodecache) + 1 > self::NODECHACHE_SIZE)
-                array_splice($this->nodecache, self::NODECHACHE_SIZE);
             $this->nodecache[$p] = self::unserialize($node);
         }
 
