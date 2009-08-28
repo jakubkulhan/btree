@@ -82,6 +82,38 @@ final class btree
     }
 
     /**
+     * Get all values where startkey <= key < endkey
+     * @param string
+     * @param string
+     * @return array
+     */
+    public function range($startkey, $endkey)
+    {
+        $start = $this->lookup($startkey);
+        $end = $this->lookup($endkey);
+        if (end($start) === NULL || end($end) === NULL) return NULL;
+
+        $upnodes = array();
+        while (!empty($start)) {
+            $nodes = array();
+            foreach (array_merge(array_shift($start), $upnodes, array_shift($end)) as $k => $v) {
+                if (!(strcmp($k, $startkey) >= 0 && strcmp($k, $endkey) < 0)) continue;
+                if (empty($start)) $nodes[$k] = $v;
+                else {
+                    list($node_type, $node) = $this->node($v);
+                    if ($node_type === NULL || $node === NULL) {
+                        return NULL;
+                    }
+                    $nodes = array_merge($nodes, $node);
+                }
+            }
+            $upnodes = $nodes;
+        }
+
+        return $upnodes;
+    }
+
+    /**
      * Set value under given key
      * @param string
      * @param mixed NULL deletes given key

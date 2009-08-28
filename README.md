@@ -32,7 +32,19 @@ That is all you need.
 
 ## Advanced
 
-Need all values? Get pointers to all leaf nodes:
+### Range searches
+
+    $btree->range("startkey", "endkey");
+
+And you'll get array of values whose key is greater than or equal to "startkey" and less than "endkey".
+
+### Get all values
+
+`range()` (assuming you do not have keys like "\xff\xff...") should do it:
+
+    $values = $btree->range("\x00", "\xff");
+
+Or get pointers to all leaf nodes:
 
     $leaves = $btree->leaves();
 
@@ -43,6 +55,10 @@ And then process nodes:
         list(,$leaf) = $btree->node($leaf);
         $values += $leaf;
     }
+
+Using `leaves()` is depracted.
+
+### Compaction
 
 Does your B+Tree consume a lot of space? Then compact it:
 
