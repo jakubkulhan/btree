@@ -207,8 +207,7 @@ final class btree
 
         // write root
         if (!(fflush($this->handle) &&
-            fwrite($this->handle, pack('N', $root) . self::HEADER) 
-                === self::SIZEOF_HEADER + self::SIZEOF_INT &&
+            self::header($this->handle, $root) &&
             fflush($this->handle))) 
         {
             ftruncate($this->handle, $pos);
