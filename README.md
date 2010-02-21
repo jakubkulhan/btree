@@ -68,7 +68,7 @@ Does your B+Tree consume a lot of space? Then compact it:
 
 The MIT license:
 
-    Copyright (c) 2009 Jakub Kulhan <jakub.kulhan@gmail.com>
+    Copyright (c) 2009-2010 Jakub Kulhan <jakub.kulhan@gmail.com>
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
