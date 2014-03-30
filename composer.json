@@ -1,0 +1,22 @@
+{
+    "name": "jakubkulhan/btree",
+    "type": "library",
+    "description": "Append-only B+Tree implemented purely in PHP. ",
+    "keywords": ["persistence","filesystem","btree"],
+    "homepage": "https://github.com/jakubkulhan/btree",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jakub Kulhan",
+            "email": "jakub.kulhan@gmail.com",
+            "homepage": "http://kulhan.info",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=5.2.0"
+    },
+    "autoload": {
+        "classmap": [ "btree.php" ]
+    }
+}
