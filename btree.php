@@ -63,7 +63,7 @@ final class btree
     /**
      * Free resources
      */
-    public function __descruct()
+    public function __destruct()
     {
         fclose($this->handle);
     }
