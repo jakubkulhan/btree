@@ -484,7 +484,7 @@ class btree
         }
 
         // create instance
-        return new self($handle, $filename);
+        return new static($handle, $filename);
     }
 
     /**
