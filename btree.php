@@ -1,5 +1,5 @@
 <?php
-final class btree
+class btree
 {
     /**
      * Size of header
@@ -39,12 +39,12 @@ final class btree
     /**
      * @var resource BTree file handle
      */
-    private $handle;
+    protected $handle;
 
     /**
      * @var string BTree filename
      */
-    private $filename;
+    protected $filename;
 
     /**
      * @var array Node cache
@@ -484,7 +484,7 @@ final class btree
         }
 
         // create instance
-        return new self($handle, $filename);
+        return new static($handle, $filename);
     }
 
     /**
