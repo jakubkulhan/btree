@@ -460,7 +460,6 @@ final class btree
     public static function open($filename)
     {
         if (!($handle = @fopen($filename, 'a+b'))) return FALSE;
-        if (($filename = realpath($filename)) === FALSE) return FALSE;
 
         // write default node if neccessary
         if (fseek($handle, 0, SEEK_END) === -1) {
